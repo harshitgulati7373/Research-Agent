@@ -1,0 +1,300 @@
+---
+alwaysApply: true
+description: Always test application functionality with real data and examples to ensure production readiness
+---
+
+# Real Data Testing Rule
+
+## Mandatory Testing with Real Data
+
+**CRITICAL**: Always test the Research Agent with real stock data and API responses to ensure production reliability and catch edge cases.
+
+### Required Test Data Sources
+
+#### Stock Symbols for Testing
+**Always use these validated symbols for testing:**
+
+```python
+# Large Cap - High liquidity, stable data
+TEST_SYMBOLS_LARGE_CAP = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+
+# Mid Cap - Moderate liquidity
+TEST_SYMBOLS_MID_CAP = ["ROKU", "SHOP", "SQ", "SNAP", "SPOT"]
+
+# Small Cap - Lower liquidity, more volatile
+TEST_SYMBOLS_SMALL_CAP = ["PLTR", "WISH", "CLOV", "BB", "GME"]
+
+# International - Different market behaviors
+TEST_SYMBOLS_INTERNATIONAL = ["BABA", "NIO", "TSM", "ASML", "SAP"]
+
+# Edge Cases - Delisted, suspended, or problematic
+TEST_SYMBOLS_EDGE_CASES = ["INVALID", "DELISTED", "SUSPENDED", ""]
+```
+
+#### API Response Testing
+**Test all data sources with real API calls:**
+
+1. **YFinance Integration**
+```python
+# Test in tests/integration/test_data_sources.py
+@pytest.mark.asyncio
+async def test_yfinance_real_data():
+    source = YFinanceSource()
+    data = await source.get_stock_data("AAPL")
+    assert data is not None
+    assert len(data.price_data) > 0
+    assert all(col in data.price_data.columns for col in ['open', 'high', 'low', 'close', 'volume'])
+```
+
+2. **Alpha Vantage Integration**
+```python
+@pytest.mark.asyncio
+async def test_alpha_vantage_real_data():
+    source = AlphaVantageSource()
+    data = await source.get_fundamentals("AAPL")
+    assert data is not None
+    assert 'financial_ratios' in data
+```
+
+3. **Finnhub Integration**
+```python
+@pytest.mark.asyncio
+async def test_finnhub_real_data():
+    source = FinnhubSource()
+    data = await source.get_company_profile("AAPL")
+    assert data is not None
+    assert 'name' in data
+```
+
+### Testing Workflow
+
+#### Before Every Feature Implementation
+1. **Test with Real Stock Data**
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Test with real data
+python -c "
+import asyncio
+from src.agent.stock_agent import analyze_stock
+
+async def test_real_data():
+    result = await analyze_stock('AAPL')
+    print(f'Analysis for AAPL: {result.recommendation}')
+    print(f'Confidence: {result.confidence:.2%}')
+    print(f'Reasoning: {result.reasoning}')
+
+asyncio.run(test_real_data())
+"
+```
+
+2. **Test Streamlit UI with Real Data**
+```bash
+# Run the full application
+streamlit run app.py
+
+# Test with multiple symbols:
+# - Enter "AAPL" and verify analysis works
+# - Enter "GOOGL" and verify different analysis
+# - Enter "INVALID" and verify error handling
+# - Test with international symbols like "BABA"
+```
+
+#### Integration Testing Requirements
+
+**Create comprehensive integration tests in [tests/integration/test_agent_integration.py](mdc:tests/integration/test_agent_integration.py):**
+
+```python
+@pytest.mark.asyncio
+class TestAgentIntegration:
+    """Test agent with real data scenarios."""
+    
+    async def test_complete_analysis_flow(self):
+        """Test complete analysis with real data."""
+        agent = get_stock_agent()
+        
+        for symbol in ["AAPL", "GOOGL", "MSFT"]:
+            result = await agent.analyze_stock(symbol)
+            
+            # Verify complete analysis
+            assert result.symbol == symbol
+            assert result.recommendation in ["BUY", "SELL", "HOLD"]
+            assert 0.0 <= result.confidence <= 1.0
+            assert result.reasoning is not None
+            assert result.fundamental_score >= 0
+            assert result.technical_score >= 0
+            
+    async def test_error_handling_real_scenarios(self):
+        """Test error handling with real problematic cases."""
+        agent = get_stock_agent()
+        
+        # Test invalid symbol
+        result = await agent.analyze_stock("INVALID123")
+        assert result.recommendation == "HOLD"
+        assert result.confidence == 0.0
+        assert "failed" in result.reasoning.lower()
+        
+    async def test_api_rate_limiting(self):
+        """Test behavior under API rate limits."""
+        agent = get_stock_agent()
+        
+        # Test rapid requests
+        tasks = [agent.analyze_stock(symbol) for symbol in ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"]]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Verify graceful handling
+        for result in results:
+            assert not isinstance(result, Exception)
+```
+
+### Data Quality Verification
+
+#### Financial Data Validation
+**Always verify data quality in real-time:**
+
+```python
+def validate_stock_data(stock_data: StockData) -> List[str]:
+    """Validate real stock data quality."""
+    errors = []
+    
+    # Price data validation
+    if stock_data.price_data is None or stock_data.price_data.empty:
+        errors.append("No price data available")
+    else:
+        # Check for missing values
+        if stock_data.price_data.isnull().any().any():
+            errors.append("Price data contains null values")
+        
+        # Check for reasonable price ranges
+        if (stock_data.price_data['close'] <= 0).any():
+            errors.append("Invalid price values (<=0)")
+        
+        # Check for sufficient data points
+        if len(stock_data.price_data) < 20:
+            errors.append("Insufficient price data (<20 days)")
+    
+    # Fundamental data validation
+    if stock_data.fundamentals:
+        required_fields = ['market_cap', 'pe_ratio', 'eps']
+        missing_fields = [field for field in required_fields 
+                         if field not in stock_data.fundamentals]
+        if missing_fields:
+            errors.append(f"Missing fundamental data: {missing_fields}")
+    
+    return errors
+```
+
+### API Error Handling Testing
+
+#### Test Real API Failure Scenarios
+```python
+@pytest.mark.asyncio
+async def test_api_failure_scenarios():
+    """Test handling of real API failures."""
+    
+    # Test network timeout
+    with patch('aiohttp.ClientSession.get') as mock_get:
+        mock_get.side_effect = asyncio.TimeoutError()
+        
+        agent = get_stock_agent()
+        result = await agent.analyze_stock("AAPL")
+        
+        # Should handle gracefully
+        assert result.recommendation == "HOLD"
+        assert "timeout" in result.reasoning.lower()
+    
+    # Test API rate limit
+    with patch('yfinance.download') as mock_download:
+        mock_download.side_effect = Exception("Rate limit exceeded")
+        
+        agent = get_stock_agent()
+        result = await agent.analyze_stock("AAPL")
+        
+        # Should handle gracefully
+        assert result.confidence == 0.0
+        assert "rate limit" in result.reasoning.lower()
+```
+
+### Performance Testing with Real Data
+
+#### Test with High-Volume Data
+```python
+@pytest.mark.asyncio
+async def test_performance_with_real_data():
+    """Test performance with real market data."""
+    
+    start_time = time.time()
+    
+    agent = get_stock_agent()
+    result = await agent.analyze_stock("AAPL")
+    
+    end_time = time.time()
+    execution_time = end_time - start_time
+    
+    # Should complete within reasonable time
+    assert execution_time < 30.0  # 30 seconds max
+    assert result.recommendation in ["BUY", "SELL", "HOLD"]
+```
+
+### Testing Checklist
+
+Before deploying or merging code:
+
+#### Data Source Testing
+- [ ] Test all data sources with real API calls
+- [ ] Verify data quality and completeness
+- [ ] Test error handling with invalid symbols
+- [ ] Test rate limiting and timeout scenarios
+- [ ] Validate data format consistency
+
+#### Agent Testing
+- [ ] Test complete analysis flow with real data
+- [ ] Verify recommendation logic with known stocks
+- [ ] Test edge cases (delisted, suspended stocks)
+- [ ] Validate confidence scores are reasonable
+- [ ] Test async performance under load
+
+#### UI Testing
+- [ ] Test Streamlit interface with real symbols
+- [ ] Verify charts render with real data
+- [ ] Test error messages with invalid input
+- [ ] Validate session state persistence
+- [ ] Test responsive design with various data sizes
+
+#### API Integration Testing
+- [ ] Test with valid API keys in `.env`
+- [ ] Verify fallback behavior when APIs fail
+- [ ] Test data source factory switching
+- [ ] Validate caching mechanisms
+- [ ] Test concurrent API calls
+
+### Files to Test
+
+Always test these files with real data:
+- [app.py](mdc:app.py) - Full Streamlit interface
+- [src/agent/stock_agent.py](mdc:src/agent/stock_agent.py) - Agent logic
+- [src/data_sources/](mdc:src/data_sources/) - All data sources
+- [src/analysis/](mdc:src/analysis/) - Analysis engines
+- [tests/integration/](mdc:tests/integration/) - Integration tests
+
+### Real Data Test Commands
+
+```bash
+# Run full test suite with real data
+pytest tests/integration/ -v
+
+# Test specific data source
+pytest tests/integration/test_data_sources.py::test_yfinance_real_data -v
+
+# Test agent integration
+pytest tests/integration/test_agent_integration.py::test_complete_analysis_flow -v
+
+# Run performance tests
+pytest tests/integration/ -k "performance" -v
+
+# Test UI with real data
+streamlit run app.py
+```
+
+**Remember**: Real data testing is not optional - it's the only way to ensure the application works in production environments with live market data.

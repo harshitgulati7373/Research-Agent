@@ -1,0 +1,51 @@
+---
+description: Project rules – LangChain + Streamlit Agentic AI
+alwaysApply: true
+---
+
+# Agentic AI Development Rules
+
+## LangChain / LangGraph
+
+- Use async methods (`ainvoke`, `abatch`) with a concurrency limiter.
+- Compile graphs with a checkpoint saver (SQLite dev, Postgres prod).
+- Attach memory modules per user session; prefer vector-store memory for multi-agent tasks.
+- Enable LangSmith tracing via `LANGSMITH_OTEL_ENABLED=1`.
+- Parse structured outputs with `GuardrailsOutputParser`.
+
+## Streamlit
+
+- Store all mutable state in `st.session_state`; one source of truth.
+- Cache external resources with `@st.cache_resource`.
+- Separate UI (`app.py`) from business logic (`/src/**.py`).
+- Write widget tests with `pytest-streamlit`.
+
+## Evaluation
+
+- Maintain LangSmith dataset; enforce ≥95 % pass on Task Adherence, Tool-Call Accuracy, Intent Resolution.
+- Block PR if eval score regresses by >5 %.
+
+## Testing
+
+- ≥90 % branch coverage; run `pytest -q`.
+- Add end-to-end test that starts Streamlit and hits agent API.
+
+## CI/CD
+
+- GitHub Actions: lint → unit tests → evals → Docker build → deploy preview.
+- Docker image exposes port 8501; build arg `--target prod`.
+
+## Security
+
+- Load secrets from `.env`; never commit keys.
+- Sanitize user inputs to prevent prompt injection.
+- Restrict outbound calls to allow-list domains.
+
+## Observability
+
+- Emit OpenTelemetry traces and Prometheus metrics (`/metrics` endpoint).
+- Alert on token cost or latency SLO breaches.
+
+## Done
+
+- Code passes mypy, ruff, pytest, LangSmith evals, and CI pipeline.

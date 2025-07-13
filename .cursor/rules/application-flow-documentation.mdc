@@ -1,0 +1,249 @@
+---
+alwaysApply: true
+description: Maintain comprehensive application flow documentation for the Research Agent
+---
+
+# Application Flow Documentation Rule
+
+## Always Maintain Current Flow Documentation
+
+**CRITICAL**: Keep the application flow documentation up-to-date with every change. This helps developers understand the system architecture and prevents errors.
+
+### Required Documentation Files
+
+#### Core Flow Documentation
+The main application flow must be documented in [docs/application-flow.md](mdc:docs/application-flow.md). This file should be updated whenever:
+
+- New features are added
+- Existing workflows are modified
+- API integrations change
+- Data processing logic is updated
+- Error handling is modified
+
+#### Flow Diagrams
+Create and maintain Mermaid diagrams showing:
+
+1. **User Interaction Flow** - How users interact with the Streamlit interface
+2. **Data Processing Flow** - How data moves through the system
+3. **Agent Decision Flow** - How the LangGraph agent makes decisions
+4. **Error Handling Flow** - How errors are caught and handled
+
+### Documentation Standards
+
+#### Flow Documentation Format
+Use this structure for [docs/application-flow.md](mdc:docs/application-flow.md):
+
+```markdown
+# Research Agent Application Flow
+
+## Overview
+Brief description of the application purpose and architecture.
+
+## User Journey
+Step-by-step user interaction flow.
+
+## System Architecture
+High-level system components and their interactions.
+
+## Data Flow
+How data moves through the application.
+
+## Agent Processing
+LangGraph agent decision-making process.
+
+## Error Handling
+How errors are handled at each level.
+
+## API Integration
+External API calls and data sources.
+
+## Performance Considerations
+Caching, rate limiting, and optimization strategies.
+```
+
+#### Code Documentation Requirements
+Every major function should have flow comments:
+
+```python
+def analyze_stock(symbol: str) -> StockRecommendation:
+    """
+    Analyze a stock and provide recommendation.
+    
+    Flow:
+    1. Validate symbol format
+    2. Fetch data from multiple sources
+    3. Run fundamental analysis
+    4. Run technical analysis
+    5. Combine analysis results
+    6. Generate recommendation
+    7. Validate and return result
+    
+    Args:
+        symbol: Stock ticker symbol
+        
+    Returns:
+        StockRecommendation with analysis results
+    """
+```
+
+### Files That Must Document Flow
+
+When modifying these files, update flow documentation:
+
+#### Core Application Files
+- [app.py](mdc:app.py) - Main Streamlit interface flow
+- [src/agent/stock_agent.py](mdc:src/agent/stock_agent.py) - Agent processing flow
+- [src/data_sources/factory.py](mdc:src/data_sources/factory.py) - Data source selection flow
+- [src/analysis/fundamental.py](mdc:src/analysis/fundamental.py) - Fundamental analysis flow
+- [src/analysis/technical.py](mdc:src/analysis/technical.py) - Technical analysis flow
+
+#### Data Source Files
+- [src/data_sources/yfinance_source.py](mdc:src/data_sources/yfinance_source.py) - YFinance data flow
+- [src/data_sources/alpha_vantage_source.py](mdc:src/data_sources/alpha_vantage_source.py) - Alpha Vantage data flow
+- [src/data_sources/base.py](mdc:src/data_sources/base.py) - Base data source interface
+
+#### Configuration Files
+- [config/settings.py](mdc:config/settings.py) - Configuration flow
+- [requirements.txt](mdc:requirements.txt) - Dependency flow
+
+### Flow Validation Checklist
+
+Before committing code changes:
+
+#### Documentation Updates
+- [ ] Updated [docs/application-flow.md](mdc:docs/application-flow.md) with changes
+- [ ] Added flow comments to new functions
+- [ ] Updated existing flow comments if logic changed
+- [ ] Verified all diagrams are current
+
+#### Code Flow Validation
+- [ ] Traced complete user journey through new changes
+- [ ] Verified error handling at each step
+- [ ] Confirmed data flow is logical and efficient
+- [ ] Checked for potential bottlenecks or race conditions
+
+#### Integration Points
+- [ ] Documented API call sequences
+- [ ] Verified data transformation flows
+- [ ] Confirmed async operation flows
+- [ ] Validated error propagation paths
+
+### Flow Documentation Commands
+
+```bash
+# Validate application flow
+python -c "
+import asyncio
+from src.agent.stock_agent import get_stock_agent
+
+async def trace_flow():
+    print('1. Creating agent...')
+    agent = get_stock_agent()
+    
+    print('2. Starting analysis...')
+    result = await agent.analyze_stock('AAPL')
+    
+    print('3. Analysis complete:')
+    print(f'   Recommendation: {result.recommendation}')
+    print(f'   Confidence: {result.confidence:.2%}')
+    print(f'   Flow completed successfully')
+
+asyncio.run(trace_flow())
+"
+
+# Test complete UI flow
+streamlit run app.py
+# Then manually test: Enter symbol → View analysis → Check all sections
+```
+
+### Flow Monitoring
+
+#### Performance Flow Tracking
+Add timing to critical flow points:
+
+```python
+import time
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def _fetch_data(self, state: AgentState) -> AgentState:
+    """Fetch stock data - Flow Step 1."""
+    start_time = time.time()
+    
+    try:
+        # Data fetching logic
+        logger.info(f"Data fetch completed in {time.time() - start_time:.2f}s")
+    except Exception as e:
+        logger.error(f"Data fetch failed after {time.time() - start_time:.2f}s: {e}")
+        
+    return state
+```
+
+#### Error Flow Tracking
+Document error paths in code:
+
+```python
+async def analyze_stock(self, symbol: str) -> StockRecommendation:
+    """
+    Main analysis flow with error handling.
+    
+    Error Flow:
+    1. Invalid symbol → Return HOLD with 0 confidence
+    2. Data fetch failure → Return HOLD with error message
+    3. Analysis failure → Return HOLD with partial results
+    4. LLM failure → Return fallback recommendation
+    """
+    try:
+        # Main flow
+        pass
+    except ValueError as e:
+        # Handle validation errors
+        logger.error(f"Validation error in flow: {e}")
+        return self._create_error_recommendation(symbol, str(e))
+    except Exception as e:
+        # Handle unexpected errors
+        logger.error(f"Unexpected error in flow: {e}")
+        return self._create_fallback_recommendation(symbol)
+```
+
+### Documentation Maintenance
+
+#### Weekly Flow Review
+- Review [docs/application-flow.md](mdc:docs/application-flow.md) for accuracy
+- Update any outdated flow descriptions
+- Add new flow diagrams if needed
+- Verify all code flow comments are current
+
+#### Monthly Flow Audit
+- Trace complete user journeys manually
+- Verify all error paths work correctly
+- Check performance at each flow step
+- Update documentation with any improvements
+
+### Flow Testing Integration
+
+#### Add Flow Tests
+```python
+@pytest.mark.asyncio
+async def test_complete_application_flow():
+    """Test the complete application flow end-to-end."""
+    
+    # Step 1: Initialize agent
+    agent = get_stock_agent()
+    
+    # Step 2: Analyze stock
+    result = await agent.analyze_stock("AAPL")
+    
+    # Step 3: Verify flow completion
+    assert result.symbol == "AAPL"
+    assert result.recommendation in ["BUY", "SELL", "HOLD"]
+    assert result.analysis_timestamp is not None
+    
+    # Step 4: Verify flow artifacts
+    assert result.fundamental_score >= 0
+    assert result.technical_score >= 0
+    assert len(result.reasoning) > 0
+```
+
+**Remember**: Flow documentation is not just for new developers - it's essential for debugging, optimization, and maintaining code quality. Keep it current and detailed.

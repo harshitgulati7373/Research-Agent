@@ -1,0 +1,281 @@
+---
+alwaysApply: true
+description: Essential best practices for creating and managing Python virtual environments for every new project
+---
+
+# Python Virtual Environment Best Practices
+
+## Why Virtual Environments Are ESSENTIAL
+
+**ALWAYS create a virtual environment for each Python project.** This is not optional—it's a fundamental best practice that prevents:
+
+- **Dependency conflicts** between projects
+- **Version incompatibilities** (e.g., Project A needs pandas 1.5.0, Project B needs pandas 2.0.0)
+- **System Python pollution** that can break other tools
+- **Deployment issues** due to missing or wrong package versions
+- **Reproducibility problems** for team members
+
+## Setup Process for New Projects
+
+### Method 1: Using `venv` (Recommended)
+
+```bash
+# Navigate to your project directory
+cd "/path/to/your/project"
+
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate        # macOS/Linux
+# or
+venv\Scripts\activate          # Windows
+
+# Upgrade pip first
+pip install --upgrade pip
+
+# Install project dependencies
+pip install -r requirements.txt
+
+# When done working
+deactivate
+```
+
+### Method 2: Using `conda`
+
+```bash
+# Create environment with specific Python version
+conda create -n project-name python=3.11
+
+# Activate environment
+conda activate project-name
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Deactivate when done
+conda deactivate
+```
+
+## Requirements.txt Best Practices
+
+### Use Version Ranges (Not Exact Versions)
+
+```bash
+# ✅ GOOD - Allows compatible updates
+streamlit>=1.29.0
+pandas>=2.2.0  # For Python 3.13+ compatibility
+langchain>=0.1.0
+
+# ❌ BAD - Too restrictive
+streamlit==1.29.0
+pandas==2.1.4  # May not work with Python 3.13
+```
+
+### Python Version Compatibility
+
+```bash
+# For Python 3.13 compatibility, use:
+pandas>=2.2.0          # NOT pandas==2.1.4
+numpy>=1.26.2          # Updated versions
+```
+
+### Updating Requirements
+
+```bash
+# After installing new packages
+pip freeze > requirements.txt
+
+# Or use pipreqs for cleaner output (only used packages)
+pip install pipreqs
+pipreqs . --force
+```
+
+## Git Integration - CRITICAL
+
+### Always Add to .gitignore
+
+```gitignore
+# Virtual Environment
+venv/
+env/
+.venv/
+.env/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# Database files
+*.db
+*.sqlite3
+
+# IDE files
+.vscode/
+.idea/
+```
+
+### Environment Variables Template
+
+Create `.env.example` (not `.env` - that should be gitignored):
+
+```bash
+# API Keys
+OPENAI_API_KEY=your_openai_api_key_here
+FINNHUB_API_KEY=your_finnhub_api_key_here
+
+# Database
+DATABASE_URL=sqlite:///app.db
+
+# Configuration
+DEBUG=True
+LOG_LEVEL=INFO
+```
+
+## Daily Workflow
+
+### Starting Work
+
+```bash
+# Navigate to project
+cd "/path/to/your/project"
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Verify you're in the right environment
+which python
+pip list
+
+# Start working...
+```
+
+### Ending Work
+
+```bash
+# Deactivate virtual environment
+deactivate
+```
+
+## Common Issues & Solutions
+
+### Python 3.13 Compatibility
+
+If you encounter build errors with packages like pandas:
+
+```bash
+# Use newer versions that support Python 3.13
+pandas>=2.2.0
+numpy>=1.26.2
+
+# Remove problematic packages
+# talib-binary  # Often incompatible with newer Python
+```
+
+### Missing System Dependencies
+
+For packages that need system libraries:
+
+```bash
+# macOS (if using Homebrew)
+brew install gcc
+brew install python@3.11
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install python3-dev
+sudo apt-get install build-essential
+```
+
+### Dependency Resolution Errors
+
+```bash
+# Clear pip cache
+pip cache purge
+
+# Try installing with no-deps for problematic packages
+pip install --no-deps package_name
+
+# Use conda-forge for complex dependencies
+conda install -c conda-forge package_name
+```
+
+## Project-Specific Considerations
+
+### For AI/ML Projects
+
+```bash
+# Common AI stack
+streamlit>=1.29.0
+langchain>=0.1.0
+openai>=1.0.0
+pandas>=2.2.0
+numpy>=1.26.2
+```
+
+### For Data Science Projects
+
+```bash
+# Data science essentials
+pandas>=2.2.0
+numpy>=1.26.2
+matplotlib>=3.8.0
+seaborn>=0.13.0
+jupyter>=1.0.0
+```
+
+### For Web Development
+
+```bash
+# Web framework essentials
+flask>=2.0.0
+# or
+django>=4.0.0
+requests>=2.31.0
+```
+
+## Verification Commands
+
+### Check Environment Setup
+
+```bash
+# Verify virtual environment is active
+which python
+# Should show: /path/to/your/project/venv/bin/python
+
+# Check installed packages
+pip list
+
+# Verify main dependencies work
+python -c "import pandas, numpy; print('Dependencies OK')"
+```
+
+### Test Application
+
+```bash
+# For Streamlit apps
+streamlit run app.py
+
+# For Flask apps
+python app.py
+
+# For Django apps
+python manage.py runserver
+```
+
+## Remember: Virtual Environments Are Non-Negotiable
+
+- **Every new project** = **new virtual environment**
+- **Always activate** before installing packages
+- **Never commit** the venv/ directory to git
+- **Always include** requirements.txt in your repo
+- **Document activation steps** in your README
+
+This prevents 90% of Python dependency issues and ensures your projects work reliably across different systems and team members.

@@ -1,0 +1,168 @@
+---
+alwaysApply: true
+description: Development workflow and setup instructions specific to the Research Agent project
+---
+
+# Research Agent Development Workflow
+
+## Project Setup
+
+The Research Agent follows all [Python Virtual Environment Best Practices](mdc:python-virtual-environments.mdc). Here's the specific setup for this project:
+
+### Initial Setup
+
+```bash
+# Navigate to Research Agent project
+cd "/Users/harshitgulati/Coding Projects/Research Agent"
+
+# Virtual environment should already exist - if not, create it
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Project Structure
+
+```
+research-agent/
+├── venv/                 # Virtual environment (gitignored)
+├── requirements.txt      # Project dependencies
+├── .env                  # Environment variables (gitignored)
+├── .gitignore           # Git ignore patterns
+├── app.py               # Main Streamlit application
+├── config/              # Configuration modules
+├── src/                 # Source code
+│   ├── data_sources/    # Financial data APIs
+│   ├── analysis/        # Analysis engines
+│   └── agent/           # LangGraph agent
+└── tests/               # Test suites
+```
+
+## Required Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# API Keys
+OPENAI_API_KEY=your_openai_api_key_here
+FINNHUB_API_KEY=your_finnhub_api_key_here
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
+
+# LangSmith (optional, for tracing)
+LANGSMITH_API_KEY=your_langsmith_api_key_here
+LANGSMITH_PROJECT=research-agent
+LANGSMITH_OTEL_ENABLED=1
+
+# Database
+DATABASE_URL=sqlite:///research_agent.db
+
+# Model Configuration
+MODEL_NAME=gpt-4
+MODEL_TEMPERATURE=0.1
+```
+
+## Development Workflow
+
+### Daily Development
+
+```bash
+# Start work session
+cd "/Users/harshitgulati/Coding Projects/Research Agent"
+source venv/bin/activate
+
+# Run application
+streamlit run app.py
+
+# Run tests
+pytest
+
+# End work session
+deactivate
+```
+
+### Key Dependencies
+
+The project uses these main packages (all managed in virtual environment):
+
+- **AI/ML Stack**: `streamlit`, `langchain`, `langgraph`, `openai`
+- **Data Analysis**: `pandas>=2.2.0`, `numpy>=1.26.2`
+- **Financial APIs**: `yfinance`, `alpha-vantage`, `finnhub-python`
+- **Technical Analysis**: `ta` (talib-binary removed for Python 3.13 compatibility)
+- **Visualization**: `plotly`, `matplotlib`, `seaborn`
+
+### Python 3.13 Compatibility
+
+This project is configured for Python 3.13 compatibility:
+
+- Uses `pandas>=2.2.0` (not 2.1.4 which has build issues)
+- Removed `talib-binary` dependency
+- Uses version ranges (`>=`) instead of exact versions
+
+## File References
+
+- Main application: [app.py](mdc:app.py)
+- Requirements: [requirements.txt](mdc:requirements.txt)
+- Git ignore: [.gitignore](mdc:.gitignore)
+- Agent logic: [src/agent/stock_agent.py](mdc:src/agent/stock_agent.py)
+- Data sources: [src/data_sources/](mdc:src/data_sources/)
+- Analysis modules: [src/analysis/](mdc:src/analysis/)
+
+## Common Commands
+
+```bash
+# Install new dependency
+pip install package_name
+pip freeze > requirements.txt
+
+# Update requirements
+pip install -r requirements.txt --upgrade
+
+# Run with specific port
+streamlit run app.py --server.port 8501
+
+# Run tests with coverage
+pytest --cov=src tests/
+
+# Check imports work
+python -c "import streamlit, pandas, yfinance, finnhub; print('All dependencies OK')"
+```
+
+## Troubleshooting
+
+### Virtual Environment Issues
+
+```bash
+# Recreate virtual environment if needed
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### API Key Issues
+
+Ensure all API keys are properly set in `.env`:
+
+1. **OpenAI**: Required for LLM functionality
+2. **Finnhub**: Primary financial data source
+3. **Alpha Vantage**: Alternative financial data
+4. **LangSmith**: Optional, for tracing and debugging
+
+### Import Errors
+
+```bash
+# Verify virtual environment is active
+which python
+# Should show: /path/to/Research Agent/venv/bin/python
+
+# Check if packages are installed
+pip list | grep streamlit
+pip list | grep pandas
+```
+
+Remember: Always work within the virtual environment to maintain dependency isolation and ensure reproducible builds.

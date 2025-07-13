@@ -1,0 +1,124 @@
+---
+alwaysApply: true
+description: Always use latest library documentation for langchain, langraph, streamlit and related AI libraries
+---
+
+# LangChain/LangGraph Documentation Reference Rule
+
+## Always Use Latest Documentation
+
+**CRITICAL**: When working with AI libraries, always refer to the latest official documentation to avoid deprecated methods and compatibility issues.
+
+### Required Documentation Sources
+
+#### LangChain (>=0.1.0)
+- **Official Docs**: https://python.langchain.com/docs/
+- **API Reference**: https://api.python.langchain.com/
+- **Migration Guide**: https://python.langchain.com/docs/migration/
+- **Key Changes**: 
+  - Use `langchain-openai` instead of `langchain.llms.openai`
+  - New prompt templates and chain syntax
+  - Updated memory and callback handling
+
+#### LangGraph (>=0.0.20)
+- **Official Docs**: https://langchain-ai.github.io/langgraph/
+- **Tutorials**: https://langchain-ai.github.io/langgraph/tutorials/
+- **API Reference**: https://langchain-ai.github.io/langgraph/reference/
+- **Key Features**:
+  - StateGraph for workflow management
+  - Checkpoint savers for persistence
+  - Async support with `ainvoke`
+
+#### Streamlit (>=1.29.0)
+- **Official Docs**: https://docs.streamlit.io/
+- **API Reference**: https://docs.streamlit.io/library/api-reference
+- **Component Library**: https://docs.streamlit.io/library/components
+- **Session State**: https://docs.streamlit.io/library/api-reference/session-state
+
+#### Financial Data Libraries
+- **yfinance**: https://github.com/ranaroussi/yfinance
+- **alpha-vantage**: https://github.com/RomelTorres/alpha_vantage
+- **finnhub-python**: https://github.com/Finnhub-Stock-API/finnhub-python
+
+### Before Making Changes
+
+1. **Check Latest Version**: Verify you're using the latest compatible version
+2. **Review Migration Guides**: Check for breaking changes in recent versions
+3. **Test Imports**: Ensure all imports work with current versions
+4. **Async Compatibility**: Verify async/await patterns are correct
+
+### Common Pitfalls to Avoid
+
+#### LangChain
+```python
+# ❌ OLD - Deprecated
+from langchain.llms import OpenAI
+from langchain.chains import LLMChain
+
+# ✅ NEW - Current
+from langchain_openai import ChatOpenAI
+from langchain.chains import LLMChain
+```
+
+#### LangGraph
+```python
+# ❌ OLD - Synchronous
+result = graph.invoke(state)
+
+# ✅ NEW - Asynchronous with proper state handling
+result = await graph.ainvoke(state)
+```
+
+#### Streamlit
+```python
+# ❌ OLD - Direct state modification
+st.session_state.data = new_data
+
+# ✅ NEW - Proper state management
+if "data" not in st.session_state:
+    st.session_state.data = {}
+st.session_state.data.update(new_data)
+```
+
+### Version Compatibility Matrix
+
+| Library | Minimum Version | Python Version | Notes |
+|---------|-----------------|----------------|--------|
+| langchain | >=0.1.0 | 3.8+ | Use langchain-openai |
+| langgraph | >=0.0.20 | 3.8+ | Async support required |
+| streamlit | >=1.29.0 | 3.8+ | Modern session state |
+| pandas | >=2.2.0 | 3.8+ | Python 3.13 compatibility |
+
+### Documentation Verification Commands
+
+```bash
+# Check installed versions
+pip list | grep -E "(langchain|langgraph|streamlit)"
+
+# Update to latest versions
+pip install --upgrade langchain langgraph streamlit
+
+# Verify imports work
+python -c "from langchain_openai import ChatOpenAI; from langgraph.graph import StateGraph; import streamlit; print('All imports successful')"
+```
+
+### Files to Update When Documentation Changes
+
+- [requirements.txt](mdc:requirements.txt) - Version constraints
+- [src/agent/stock_agent.py](mdc:src/agent/stock_agent.py) - Agent implementation
+- [app.py](mdc:app.py) - Streamlit interface
+- [config/settings.py](mdc:config/settings.py) - Configuration
+- [tests/](mdc:tests/) - Test files
+
+### Error Prevention Checklist
+
+Before implementing new features:
+- [ ] Check latest documentation for the specific library
+- [ ] Verify method signatures haven't changed
+- [ ] Test with current version constraints
+- [ ] Update imports if needed
+- [ ] Check async/await compatibility
+- [ ] Verify error handling patterns
+- [ ] Test with real data scenarios
+
+**Remember**: AI libraries evolve rapidly. Always verify current best practices before implementing new features.
