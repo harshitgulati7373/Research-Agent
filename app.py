@@ -511,22 +511,41 @@ def main():
                 if show_charts:
                     st.header("📊 Charts & Visualizations")
                     
-                    # Get stock data for charts
+                    # Use enriched data from recommendation if available, otherwise fetch fresh data
                     try:
-                        factory = get_data_source_factory()
-                        stock_data = asyncio.run(factory.get_stock_data(symbol, period))
+                        if recommendation.enriched_price_data is not None and not recommendation.enriched_price_data.empty:
+                            # Use enriched data with technical indicators from analysis
+                            price_data = recommendation.enriched_price_data
+                            st.info("📈 Using enriched data with technical indicators from analysis")
+                        else:
+                            # Fallback: fetch fresh data
+                            factory = get_data_source_factory()
+                            stock_data = asyncio.run(factory.get_stock_data(symbol, period))
+                            price_data = stock_data.price_data if stock_data else None
+                            st.warning("⚠️ Using fresh data without technical indicators")
                         
-                        if stock_data and not stock_data.price_data.empty:
+                        if price_data is not None and not price_data.empty:
                             # Price chart
-                            price_fig = create_price_chart(stock_data.price_data, symbol)
+                            price_fig = create_price_chart(price_data, symbol)
                             st.plotly_chart(price_fig, use_container_width=True)
                             
                             # Technical indicators chart
-                            tech_fig = create_technical_indicators_chart(stock_data.price_data, symbol)
+                            tech_fig = create_technical_indicators_chart(price_data, symbol)
                             st.plotly_chart(tech_fig, use_container_width=True)
+                            
+                            # Debug info for technical indicators
+                            tech_indicators = ['rsi', 'macd', 'macd_signal', 'bb_upper', 'bb_middle', 'bb_lower']
+                            available_indicators = [col for col in tech_indicators if col in price_data.columns]
+                            if available_indicators:
+                                st.success(f"✅ Technical indicators available: {', '.join(available_indicators)}")
+                            else:
+                                st.error("❌ No technical indicators found in data")
+                        else:
+                            st.error("❌ No price data available for charts")
                             
                     except Exception as e:
                         st.error(f"Error creating charts: {str(e)}")
+                        logger.error(f"Chart creation error: {e}")
                 
                 # Detailed analysis (if enabled)
                 if show_detailed_analysis:

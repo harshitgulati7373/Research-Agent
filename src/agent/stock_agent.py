@@ -7,6 +7,7 @@ and LangChain for LLM interactions.
 """
 
 import asyncio
+import os
 from typing import Dict, Any, List, Optional, Tuple, Annotated
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -20,11 +21,16 @@ from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+# LangSmith integration
+from langsmith import Client as LangSmithClient
+from langchain.globals import set_debug, set_verbose
+
 from src.data_sources.factory import get_data_source_factory
 from src.analysis.fundamental import FundamentalAnalyzer, FundamentalAnalysis
 from src.analysis.technical import TechnicalAnalyzer, TechnicalAnalysis
 from src.data_sources.base import StockData
 from config.settings import get_settings
+import pandas as pd
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +53,7 @@ class StockRecommendation:
     time_horizon: str = "MEDIUM_TERM"  # SHORT_TERM, MEDIUM_TERM, LONG_TERM
     key_factors: List[str] = None
     analysis_timestamp: datetime = None
+    enriched_price_data: Optional[pd.DataFrame] = None  # Price data with technical indicators for charts
     
     def __post_init__(self):
         if self.key_factors is None:
@@ -73,26 +80,91 @@ class AgentState:
             self.messages = []
 
 
+# Global flag to track LangSmith initialization
+_LANGSMITH_INITIALIZED = False
+
 class StockAnalysisAgent:
-    """Main stock analysis agent using LangGraph."""
+    """
+    Stock analysis agent using LangGraph for structured decision-making.
+    
+    This agent orchestrates the complete stock analysis workflow:
+    1. Data fetching from multiple sources
+    2. Fundamental analysis
+    3. Technical analysis  
+    4. LLM-powered recommendation generation
+    5. Validation and final recommendation
+    """
     
     def __init__(self, checkpoint_saver: Optional[BaseCheckpointSaver] = None):
+        """Initialize the stock analysis agent."""
         self.settings = get_settings()
+        
+        # Initialize data sources
+        self.data_factory = get_data_source_factory()
+        self.fundamental_analyzer = FundamentalAnalyzer()
+        self.technical_analyzer = TechnicalAnalyzer()
+        
+        # Initialize checkpoint saver for persistence
+        self.checkpoint_saver = checkpoint_saver or MemorySaver()
+        
+        # Setup LangSmith tracing
+        self._setup_langsmith()
+        
+        # Initialize LLM
         self.llm = ChatOpenAI(
             model=self.settings.model_name,
             temperature=self.settings.model_temperature,
             api_key=self.settings.openai_api_key
         )
         
-        self.fundamental_analyzer = FundamentalAnalyzer()
-        self.technical_analyzer = TechnicalAnalyzer()
-        self.data_factory = get_data_source_factory()
-        
-        # Initialize checkpoint saver for persistence
-        self.checkpoint_saver = checkpoint_saver or MemorySaver()
-        
         # Build the analysis graph
         self.graph = self._build_graph()
+        logger.info("✅ Stock Analysis Agent initialized successfully")
+
+    def _setup_langsmith(self):
+        """Setup LangSmith tracing if configured."""
+        global _LANGSMITH_INITIALIZED
+        
+        try:
+            if self.settings.langsmith_api_key and not _LANGSMITH_INITIALIZED:
+                # Set environment variables for LangSmith
+                os.environ["LANGSMITH_API_KEY"] = self.settings.langsmith_api_key
+                os.environ["LANGSMITH_PROJECT"] = self.settings.langsmith_project
+                os.environ["LANGSMITH_TRACING"] = "true"
+                
+                # Clear any existing endpoint to prevent conflicts
+                if "LANGSMITH_ENDPOINT" in os.environ:
+                    del os.environ["LANGSMITH_ENDPOINT"]
+                
+                # Initialize LangSmith client with error handling
+                try:
+                    self.langsmith_client = LangSmithClient()
+                    _LANGSMITH_INITIALIZED = True
+                    logger.info(f"✅ LangSmith tracing enabled for project: {self.settings.langsmith_project}")
+                except Exception as client_error:
+                    logger.warning(f"⚠️ LangSmith client initialization failed: {client_error}")
+                    self.langsmith_client = None
+                    # Disable tracing if client fails
+                    os.environ["LANGSMITH_TRACING"] = "false"
+                
+                # Enable debug mode for development (only if client initialized successfully)
+                if self.langsmith_client and self.settings.log_level == "DEBUG":
+                    set_debug(True)
+                    set_verbose(True)
+            elif _LANGSMITH_INITIALIZED:
+                logger.info("🔄 LangSmith already initialized globally, reusing configuration")
+                self.langsmith_client = LangSmithClient() if self.settings.langsmith_api_key else None
+            else:
+                logger.info("📊 LangSmith not configured - tracing disabled")
+                self.langsmith_client = None
+                # Ensure tracing is disabled
+                os.environ["LANGSMITH_TRACING"] = "false"
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to setup LangSmith: {e}")
+            self.langsmith_client = None
+            # Ensure tracing is disabled on any error
+            os.environ["LANGSMITH_TRACING"] = "false"
         
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph analysis workflow."""
@@ -236,7 +308,7 @@ class StockAnalysisAgent:
                 
             logger.info(f"Running technical analysis for {state.symbol}")
             
-            # Run technical analysis
+            # Run technical analysis (this will also enrich the price data with indicators)
             technical_analysis = await self.technical_analyzer.analyze(state.stock_data)
             state.technical_analysis = technical_analysis
             
@@ -246,7 +318,7 @@ class StockAnalysisAgent:
                 "timestamp": datetime.now()
             })
             
-            logger.info(f"Technical analysis complete for {state.symbol}")
+            logger.info(f"Technical analysis complete for {state.symbol}. Price data now includes technical indicators.")
             
         except Exception as e:
             error_msg = f"Error in technical analysis for {state.symbol}: {str(e)}"
@@ -492,53 +564,47 @@ class StockAnalysisAgent:
         elif combined_score <= 30:
             risk_level = "HIGH"
             
-        return StockRecommendation(
+        # Create final recommendation
+        recommendation = StockRecommendation(
             symbol=state.symbol,
             recommendation=recommendation,
             confidence=confidence,
+            price_target=None, # LLM doesn't provide price target
             reasoning=response,
-            fundamental_score=fundamental_score,
-            technical_score=technical_score,
+            fundamental_score=state.fundamental_analysis.score if state.fundamental_analysis else 0.0,
+            technical_score=state.technical_analysis.score if state.technical_analysis else 0.0,
             combined_score=combined_score,
-            fundamental_signal=state.fundamental_analysis.overall_signal.signal if state.fundamental_analysis else "UNKNOWN",
-            technical_signal=state.technical_analysis.overall_signal.signal if state.technical_analysis else "UNKNOWN",
+            fundamental_signal=state.fundamental_analysis.overall_signal.signal if state.fundamental_analysis else "HOLD",
+            technical_signal=state.technical_analysis.overall_signal.signal if state.technical_analysis else "HOLD",
             risk_level=risk_level,
-            key_factors=key_factors
+            time_horizon="MEDIUM_TERM", # Default
+            key_factors=key_factors,
+            enriched_price_data=state.stock_data.price_data if state.stock_data else None  # Include enriched data
         )
+        
+        return recommendation
         
     def _create_fallback_recommendation(self, state: AgentState) -> StockRecommendation:
         """Create a fallback recommendation when LLM fails."""
+        current_price = None
         
-        # Calculate scores
-        fundamental_score = state.fundamental_analysis.score if state.fundamental_analysis else 50.0
-        technical_score = state.technical_analysis.score if state.technical_analysis else 50.0
-        combined_score = (fundamental_score * 0.6) + (technical_score * 0.4)
+        if state.stock_data and state.stock_data.price_data is not None and not state.stock_data.price_data.empty:
+            current_price = state.stock_data.price_data['close'].iloc[-1]
         
-        # Determine recommendation based on score
-        if combined_score >= 65:
-            recommendation = "BUY"
-            confidence = 0.7
-            reasoning = "Strong combined analysis signals suggest a buy opportunity"
-        elif combined_score <= 35:
-            recommendation = "SELL"
-            confidence = 0.7
-            reasoning = "Weak combined analysis signals suggest selling"
-        else:
-            recommendation = "HOLD"
-            confidence = 0.5
-            reasoning = "Mixed signals suggest holding current position"
-            
+        # Conservative approach when analysis fails
         return StockRecommendation(
             symbol=state.symbol,
-            recommendation=recommendation,
-            confidence=confidence,
-            reasoning=reasoning,
-            fundamental_score=fundamental_score,
-            technical_score=technical_score,
-            combined_score=combined_score,
-            fundamental_signal=state.fundamental_analysis.overall_signal.signal if state.fundamental_analysis else "UNKNOWN",
-            technical_signal=state.technical_analysis.overall_signal.signal if state.technical_analysis else "UNKNOWN",
-            risk_level="MEDIUM"
+            recommendation="HOLD",
+            confidence=0.0,
+            reasoning="Analysis failed - insufficient data for recommendation. Consider manual review.",
+            fundamental_score=state.fundamental_analysis.score if state.fundamental_analysis else 0.0,
+            technical_score=state.technical_analysis.score if state.technical_analysis else 0.0,
+            combined_score=0.0,
+            fundamental_signal=state.fundamental_analysis.overall_signal.signal if state.fundamental_analysis else "HOLD",
+            technical_signal=state.technical_analysis.overall_signal.signal if state.technical_analysis else "HOLD",
+            risk_level="HIGH",
+            key_factors=["Analysis failed", "Insufficient data", "Manual review recommended"],
+            enriched_price_data=state.stock_data.price_data if state.stock_data else None  # Include enriched data
         )
         
     async def get_analysis_history(self, symbol: str, limit: int = 10) -> List[Dict[str, Any]]:
@@ -552,8 +618,20 @@ class StockAnalysisAgent:
             return []
             
     async def close(self):
-        """Close the agent and cleanup resources."""
-        await self.data_factory.close()
+        """Clean up agent resources."""
+        global _LANGSMITH_INITIALIZED
+        
+        if self.data_factory:
+            await self.data_factory.close()
+        
+        # Reset LangSmith global state to allow fresh initialization
+        if _LANGSMITH_INITIALIZED:
+            _LANGSMITH_INITIALIZED = False
+            if "LANGSMITH_TRACING" in os.environ:
+                os.environ["LANGSMITH_TRACING"] = "false"
+            logger.info("🧹 LangSmith state cleaned up")
+            
+        logger.info("Agent closed successfully")
 
 
 # Global agent instance

@@ -92,6 +92,9 @@ class TechnicalAnalyzer:
         # Calculate technical indicators
         enriched_data = self._calculate_indicators(stock_data.price_data)
         
+        # Store enriched data back to stock_data for chart access
+        stock_data.price_data = enriched_data
+        
         # Perform individual analyses
         trend_analysis = self._analyze_trend(enriched_data)
         momentum_analysis = self._analyze_momentum(enriched_data)
