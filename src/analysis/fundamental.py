@@ -44,6 +44,7 @@ class FundamentalAnalysis:
     efficiency_analysis: Dict[str, Any]
     market_position_analysis: Dict[str, Any]
     risk_analysis: Dict[str, Any]
+    moat_analysis: Dict[str, Any]  # NEW: Economic moat analysis
     score: float  # Overall score 0-100
 
 
@@ -80,6 +81,16 @@ class FundamentalAnalyzer:
             'book_value_growth': 0.15
         }
         
+        # NEW: MOAT analysis weights for competitive advantage factors
+        self.moat_weights = {
+            'brand_strength': 0.25,      # Brand power and recognition
+            'cost_advantage': 0.20,      # Cost leadership position  
+            'network_effects': 0.15,     # Platform/network benefits
+            'switching_costs': 0.15,     # Customer switching barriers
+            'regulatory_moat': 0.10,     # Regulatory advantages
+            'scale_economies': 0.15      # Economies of scale benefits
+        }
+        
     async def analyze(self, stock_data: StockData) -> FundamentalAnalysis:
         """
         Perform comprehensive fundamental analysis.
@@ -101,11 +112,13 @@ class FundamentalAnalyzer:
         efficiency_analysis = self._analyze_efficiency(stock_data)
         market_position_analysis = self._analyze_market_position(stock_data)
         risk_analysis = self._analyze_risk(stock_data)
+        moat_analysis = self._analyze_moat(stock_data)  # NEW: Economic moat analysis
         
         # Calculate overall score and signal
         overall_score = self._calculate_overall_score(
             valuation_analysis, profitability_analysis, financial_health_analysis,
-            growth_analysis, efficiency_analysis, market_position_analysis, risk_analysis
+            growth_analysis, efficiency_analysis, market_position_analysis, risk_analysis,
+            moat_analysis  # NEW: Include MOAT in overall scoring
         )
         
         overall_signal = self._generate_overall_signal(overall_score, stock_data)
@@ -121,6 +134,7 @@ class FundamentalAnalyzer:
             efficiency_analysis=efficiency_analysis,
             market_position_analysis=market_position_analysis,
             risk_analysis=risk_analysis,
+            moat_analysis=moat_analysis,  # NEW: Include MOAT analysis results
             score=overall_score
         )
         
@@ -738,24 +752,196 @@ class FundamentalAnalyzer:
             'signal': self._score_to_signal(risk_score)
         }
         
+    def _analyze_moat(self, stock_data: StockData) -> Dict[str, Any]:
+        """
+        Analyze economic moat factors using available financial metrics.
+        
+        Economic moat analysis evaluates a company's sustainable competitive advantages
+        by examining financial indicators that suggest strong competitive positioning.
+        """
+        fundamental_data = stock_data.fundamental_data
+        
+        # Extract relevant financial metrics for MOAT analysis
+        gross_margin = fundamental_data.get('gross_margin') or fundamental_data.get('grossmargin')
+        operating_margin = fundamental_data.get('operating_margin') or fundamental_data.get('operatingmarginttm')
+        return_on_invested_capital = fundamental_data.get('return_on_invested_capital') or fundamental_data.get('roic')
+        return_on_equity = fundamental_data.get('return_on_equity') or fundamental_data.get('returnonequityttm')
+        revenue_growth = fundamental_data.get('revenue_growth') or fundamental_data.get('revenuegrowth')
+        market_cap = fundamental_data.get('market_cap') or fundamental_data.get('marketcap')
+        revenue = fundamental_data.get('revenue') or fundamental_data.get('totalrevenue')
+        debt_to_equity = fundamental_data.get('debt_to_equity') or fundamental_data.get('debttoequity')
+        
+        # Convert percentages to decimals if needed
+        if gross_margin and gross_margin > 1:
+            gross_margin = gross_margin / 100
+        if operating_margin and operating_margin > 1:
+            operating_margin = operating_margin / 100
+        if return_on_invested_capital and return_on_invested_capital > 1:
+            return_on_invested_capital = return_on_invested_capital / 100
+        if return_on_equity and return_on_equity > 1:
+            return_on_equity = return_on_equity / 100
+        if revenue_growth and revenue_growth > 1:
+            revenue_growth = revenue_growth / 100
+            
+        moat_scores = {}
+        
+        # Brand Strength Analysis (High gross margins indicate pricing power/brand strength)
+        brand_score = 50  # Default neutral
+        if gross_margin is not None:
+            if gross_margin > 0.60:  # >60% gross margin indicates strong brand/pricing power
+                brand_score = 90
+            elif gross_margin > 0.40:  # >40% gross margin indicates good brand
+                brand_score = 75
+            elif gross_margin > 0.25:  # >25% gross margin indicates some brand power
+                brand_score = 60
+            elif gross_margin > 0.15:  # >15% gross margin indicates limited brand power
+                brand_score = 45
+            else:
+                brand_score = 30  # Low gross margin indicates weak brand/commodity business
+        moat_scores['brand_strength'] = brand_score
+        
+        # Cost Advantage Analysis (High operating margins indicate cost efficiency)
+        cost_score = 50  # Default neutral
+        if operating_margin is not None:
+            if operating_margin > 0.25:  # >25% operating margin indicates significant cost advantage
+                cost_score = 90
+            elif operating_margin > 0.15:  # >15% operating margin indicates good cost control
+                cost_score = 75
+            elif operating_margin > 0.08:  # >8% operating margin indicates decent efficiency
+                cost_score = 60
+            elif operating_margin > 0.03:  # >3% operating margin indicates some efficiency
+                cost_score = 45
+            else:
+                cost_score = 30  # Low operating margin indicates cost disadvantage
+        moat_scores['cost_advantage'] = cost_score
+        
+        # Network Effects Analysis (Revenue growth acceleration and scale benefits)
+        network_score = 50  # Default neutral
+        if revenue_growth is not None and market_cap is not None:
+            # Higher revenue growth in larger companies suggests network effects
+            if market_cap > 10_000_000_000 and revenue_growth > 0.20:  # Large company with >20% growth
+                network_score = 90
+            elif market_cap > 5_000_000_000 and revenue_growth > 0.15:  # Mid-large company with >15% growth
+                network_score = 75
+            elif revenue_growth > 0.25:  # High growth regardless of size
+                network_score = 70
+            elif revenue_growth > 0.10:  # Moderate growth
+                network_score = 60
+            elif revenue_growth > 0.05:  # Low growth
+                network_score = 45
+            else:
+                network_score = 30  # Declining or no growth
+        moat_scores['network_effects'] = network_score
+        
+        # Switching Costs Analysis (High ROIC indicates customer stickiness/switching costs)
+        switching_score = 50  # Default neutral
+        if return_on_invested_capital is not None:
+            if return_on_invested_capital > 0.20:  # >20% ROIC indicates very high switching costs
+                switching_score = 90
+            elif return_on_invested_capital > 0.15:  # >15% ROIC indicates high switching costs
+                switching_score = 75
+            elif return_on_invested_capital > 0.10:  # >10% ROIC indicates moderate switching costs
+                switching_score = 60
+            elif return_on_invested_capital > 0.05:  # >5% ROIC indicates some switching costs
+                switching_score = 45
+            else:
+                switching_score = 30  # Low ROIC indicates low switching costs
+        elif return_on_equity is not None:
+            # Use ROE as proxy if ROIC not available
+            if return_on_equity > 0.20:
+                switching_score = 80
+            elif return_on_equity > 0.15:
+                switching_score = 65
+            elif return_on_equity > 0.10:
+                switching_score = 55
+            else:
+                switching_score = 40
+        moat_scores['switching_costs'] = switching_score
+        
+        # Regulatory Moat Analysis (Market position and stability in regulated sectors)
+        regulatory_score = 50  # Default neutral
+        # This is harder to determine from financial data alone, use debt levels as proxy for stability
+        if debt_to_equity is not None and operating_margin is not None:
+            # Low debt + high margins may indicate regulatory advantages
+            if debt_to_equity < 0.3 and operating_margin > 0.15:
+                regulatory_score = 75  # Strong balance sheet + high margins
+            elif debt_to_equity < 0.5 and operating_margin > 0.10:
+                regulatory_score = 65  # Good balance sheet + decent margins
+            elif debt_to_equity < 1.0:
+                regulatory_score = 55  # Reasonable debt levels
+            else:
+                regulatory_score = 40  # High debt suggests regulatory vulnerability
+        moat_scores['regulatory_moat'] = regulatory_score
+        
+        # Scale Economies Analysis (Large revenue with high margins indicates scale benefits)
+        scale_score = 50  # Default neutral
+        if revenue is not None and operating_margin is not None:
+            # Large revenue with high margins indicates scale economies
+            if revenue > 50_000_000_000 and operating_margin > 0.15:  # >$50B revenue + >15% margin
+                scale_score = 90
+            elif revenue > 20_000_000_000 and operating_margin > 0.12:  # >$20B revenue + >12% margin
+                scale_score = 80
+            elif revenue > 10_000_000_000 and operating_margin > 0.10:  # >$10B revenue + >10% margin
+                scale_score = 70
+            elif revenue > 5_000_000_000 and operating_margin > 0.08:  # >$5B revenue + >8% margin
+                scale_score = 60
+            elif revenue > 1_000_000_000:  # >$1B revenue indicates some scale
+                scale_score = 55
+            else:
+                scale_score = 45  # Small scale, limited economies
+        moat_scores['scale_economies'] = scale_score
+        
+        # Calculate weighted MOAT score
+        weighted_score = sum(
+            moat_scores.get(metric, 50) * weight
+            for metric, weight in self.moat_weights.items()
+        )
+        
+        # Determine overall MOAT strength
+        moat_strength = "No Moat"
+        if weighted_score >= 75:
+            moat_strength = "Wide Moat"
+        elif weighted_score >= 60:
+            moat_strength = "Narrow Moat"
+        
+        return {
+            'scores': moat_scores,
+            'weighted_score': weighted_score,
+            'moat_strength': moat_strength,  # Wide Moat, Narrow Moat, or No Moat
+            'metrics': {
+                'gross_margin': gross_margin,
+                'operating_margin': operating_margin,
+                'return_on_invested_capital': return_on_invested_capital,
+                'return_on_equity': return_on_equity,
+                'revenue_growth': revenue_growth,
+                'market_cap': market_cap,
+                'revenue': revenue,
+                'debt_to_equity': debt_to_equity
+            },
+            'signal': self._score_to_signal(weighted_score),
+            'analysis_summary': f"Economic Moat: {moat_strength} (Score: {weighted_score:.1f}/100)"
+        }
+        
     def _calculate_overall_score(self, valuation_analysis: Dict[str, Any], 
                                profitability_analysis: Dict[str, Any],
                                financial_health_analysis: Dict[str, Any],
                                growth_analysis: Dict[str, Any],
                                efficiency_analysis: Dict[str, Any],
                                market_position_analysis: Dict[str, Any],
-                               risk_analysis: Dict[str, Any]) -> float:
+                               risk_analysis: Dict[str, Any],
+                               moat_analysis: Dict[str, Any]) -> float:
         """Calculate overall fundamental score."""
         
-        # Weights for different analysis categories
+        # Weights for different analysis categories (must sum to 1.0)
         category_weights = {
-            'valuation': 0.25,
-            'profitability': 0.20,
-            'financial_health': 0.15,
-            'growth': 0.20,
-            'efficiency': 0.05,
-            'market_position': 0.10,
-            'risk': 0.05
+            'valuation': 0.20,       # Reduced from 0.25 to make room for MOAT
+            'profitability': 0.18,   # Reduced from 0.20 to make room for MOAT
+            'financial_health': 0.15, # Unchanged
+            'growth': 0.18,          # Reduced from 0.20 to make room for MOAT
+            'efficiency': 0.05,      # Unchanged
+            'market_position': 0.09, # Reduced from 0.10 to make room for MOAT  
+            'risk': 0.05,           # Unchanged
+            'moat': 0.10            # NEW: 10% weight for MOAT analysis (competitive advantage is important!)
         }
         
         overall_score = (
@@ -765,7 +951,8 @@ class FundamentalAnalyzer:
             growth_analysis['weighted_score'] * category_weights['growth'] +
             efficiency_analysis['weighted_score'] * category_weights['efficiency'] +
             market_position_analysis['weighted_score'] * category_weights['market_position'] +
-            risk_analysis['weighted_score'] * category_weights['risk']
+            risk_analysis['weighted_score'] * category_weights['risk'] +
+            moat_analysis['weighted_score'] * category_weights['moat'] # NEW: Include MOAT in overall scoring
         )
         
         return overall_score

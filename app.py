@@ -418,6 +418,50 @@ def display_technical_analysis(recommendation: StockRecommendation):
         )
 
 
+def display_moat_analysis(recommendation: StockRecommendation):
+    """Display MOAT (Economic Moat) analysis results."""
+    st.subheader("🏰 Economic MOAT Analysis")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(
+            create_score_visualization(
+                recommendation.moat_score, 
+                "Economic MOAT Score"
+            ), 
+            unsafe_allow_html=True
+        )
+    
+    with col2:
+        # Color-code MOAT strength
+        moat_color = "#28a745" if recommendation.moat_strength == "Wide Moat" else "#ffc107" if recommendation.moat_strength == "Narrow Moat" else "#dc3545"
+        st.metric(
+            label="MOAT Strength",
+            value=recommendation.moat_strength,
+            delta=f"Score: {recommendation.moat_score:.1f}/100"
+        )
+        
+        # Display colored indicator
+        st.markdown(f'<div style="background-color: {moat_color}; color: white; padding: 0.5rem; border-radius: 0.5rem; text-align: center; margin-top: 0.5rem;"><strong>{recommendation.moat_strength}</strong></div>', 
+                   unsafe_allow_html=True)
+    
+    with col3:
+        st.metric(
+            label="Competitive Advantages",
+            value=len(recommendation.competitive_advantages),
+            delta=f"Weight: 10% in Analysis"
+        )
+        
+        # List competitive advantages
+        if recommendation.competitive_advantages:
+            st.markdown("**Key Advantages:**")
+            for advantage in recommendation.competitive_advantages:
+                st.markdown(f"• {advantage}")
+        else:
+            st.markdown("*No strong competitive advantages identified*")
+
+
 def display_key_metrics(recommendation: StockRecommendation):
     """Display key metrics and factors."""
     st.subheader("🔍 Key Factors")
@@ -496,13 +540,16 @@ def main():
                 )
                 
                 # Analysis results
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 
                 with col1:
                     display_fundamental_analysis(recommendation)
                 
                 with col2:
                     display_technical_analysis(recommendation)
+                
+                with col3:
+                    display_moat_analysis(recommendation)
                 
                 # Key metrics
                 display_key_metrics(recommendation)

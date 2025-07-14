@@ -54,12 +54,18 @@ class StockRecommendation:
     key_factors: List[str] = None
     analysis_timestamp: datetime = None
     enriched_price_data: Optional[pd.DataFrame] = None  # Price data with technical indicators for charts
+    # NEW: MOAT analysis fields
+    moat_score: float = 0.0  # Economic moat score 0-100
+    moat_strength: str = "No Moat"  # Wide Moat, Narrow Moat, or No Moat
+    competitive_advantages: List[str] = None  # List of identified competitive advantages
     
     def __post_init__(self):
         if self.key_factors is None:
             self.key_factors = []
         if self.analysis_timestamp is None:
             self.analysis_timestamp = datetime.now()
+        if self.competitive_advantages is None:
+            self.competitive_advantages = []
 
 
 @dataclass
@@ -564,6 +570,33 @@ class StockAnalysisAgent:
         elif combined_score <= 30:
             risk_level = "HIGH"
             
+        # Extract MOAT data from fundamental analysis
+        moat_score = 0.0
+        moat_strength = "No Moat"
+        competitive_advantages = []
+        
+        if state.fundamental_analysis and hasattr(state.fundamental_analysis, 'moat_analysis'):
+            moat_analysis = state.fundamental_analysis.moat_analysis
+            moat_score = moat_analysis.get('weighted_score', 0.0)
+            moat_strength = moat_analysis.get('moat_strength', 'No Moat')
+            
+            # Identify competitive advantages based on scores
+            scores = moat_analysis.get('scores', {})
+            for advantage, score in scores.items():
+                if score > 70:  # Strong advantage
+                    if advantage == 'brand_strength':
+                        competitive_advantages.append("Strong Brand Power")
+                    elif advantage == 'cost_advantage':
+                        competitive_advantages.append("Cost Leadership")
+                    elif advantage == 'network_effects':
+                        competitive_advantages.append("Network Effects")
+                    elif advantage == 'switching_costs':
+                        competitive_advantages.append("High Switching Costs")
+                    elif advantage == 'regulatory_moat':
+                        competitive_advantages.append("Regulatory Protection")
+                    elif advantage == 'scale_economies':
+                        competitive_advantages.append("Economies of Scale")
+        
         # Create final recommendation
         recommendation = StockRecommendation(
             symbol=state.symbol,
@@ -579,7 +612,11 @@ class StockAnalysisAgent:
             risk_level=risk_level,
             time_horizon="MEDIUM_TERM", # Default
             key_factors=key_factors,
-            enriched_price_data=state.stock_data.price_data if state.stock_data else None  # Include enriched data
+            enriched_price_data=state.stock_data.price_data if state.stock_data else None,  # Include enriched data
+            # NEW: Include MOAT analysis data
+            moat_score=moat_score,
+            moat_strength=moat_strength,
+            competitive_advantages=competitive_advantages
         )
         
         return recommendation
@@ -604,7 +641,11 @@ class StockAnalysisAgent:
             technical_signal=state.technical_analysis.overall_signal.signal if state.technical_analysis else "HOLD",
             risk_level="HIGH",
             key_factors=["Analysis failed", "Insufficient data", "Manual review recommended"],
-            enriched_price_data=state.stock_data.price_data if state.stock_data else None  # Include enriched data
+            enriched_price_data=state.stock_data.price_data if state.stock_data else None,  # Include enriched data
+            # NEW: Default MOAT values for fallback
+            moat_score=0.0,
+            moat_strength="No Moat",
+            competitive_advantages=[]
         )
         
     async def get_analysis_history(self, symbol: str, limit: int = 10) -> List[Dict[str, Any]]:
