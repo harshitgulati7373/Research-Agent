@@ -453,8 +453,8 @@ def main():
         # Analysis period
         period = st.selectbox(
             "Analysis Period",
-            ["1y", "6mo", "3mo", "1mo"],
-            index=0
+            ["5y", "1y", "6mo", "3mo", "1mo"],
+            index=1  # Default to 1y (second option)
         )
         
         # Analysis button

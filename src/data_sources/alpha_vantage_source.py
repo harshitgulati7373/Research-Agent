@@ -138,7 +138,9 @@ class AlphaVantageDataSource(BaseDataSource):
             df['volume_sma'] = df['volume'].rolling(window=20).mean()
             
             # Filter by period if needed
-            if period == '1y':
+            if period == '5y':
+                df = df.last('1825D')  # 5 years = 5 * 365 = 1825 days
+            elif period == '1y':
                 df = df.last('365D')
             elif period == '6m':
                 df = df.last('180D')

@@ -16,7 +16,7 @@ A comprehensive AI-powered research agent that combines fundamental and technica
 
 ### 🎯 Key Capabilities
 - Real-time stock symbol validation
-- Multi-timeframe analysis (1 month to 1 year)
+- Multi-timeframe analysis (1 month to 5 years)
 - Interactive visualizations with Plotly
 - Historical analysis tracking
 - Professional-grade scoring system
@@ -141,7 +141,7 @@ MAX_CONCURRENT_REQUESTS=10
 
 2. **Enter a stock symbol** (e.g., AAPL, GOOGL, MSFT)
 
-3. **Select analysis period** (1m, 3m, 6m, 1y)
+3. **Select analysis period** (1m, 3m, 6m, 1y, 5y)
 
 4. **Click "Analyze Stock"** to get comprehensive analysis
 
